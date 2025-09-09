@@ -10,4 +10,4 @@ spring:
     name: configuration
 
 server:
-  port: 8888
+  port: ${CONFIGURATION_ENDPOINT_PORT}

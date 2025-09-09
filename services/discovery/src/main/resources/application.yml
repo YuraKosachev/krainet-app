@@ -1,5 +1,5 @@
 spring:
   config:
-    import: configserver:http://localhost:8888
+    import: configserver:${CONFIGURATION_ENDPOINT_HOST}:${CONFIGURATION_ENDPOINT_PORT}
   application:
     name: discovery
