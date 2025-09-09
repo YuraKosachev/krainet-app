@@ -23,6 +23,10 @@ public class SendEmailTask {
     public void sendEmail() {
         var notifications = notificationRepository.getAllByStatuses(Set.of(NotificationStatus.ERROR, NotificationStatus.NEW));
         log.info("Sending email");
+        if(notifications.isEmpty()) {
+            log.info("No notifications found");
+            return;
+        }
         try{
             notifications.forEach(notification -> {notification.setStatus(NotificationStatus.PROCCESSED);});
             notificationRepository.saveAll(notifications);
@@ -32,7 +36,7 @@ public class SendEmailTask {
                 notification.setStatus(NotificationStatus.SENT);
             });
             notificationRepository.saveAll(notifications);
-            log.info("Emails sent");
+            log.info(String.format("Notifications sent successfully. Total notifications: %d", notificationRepository.count()));
         }catch (Exception e){
             notifications.forEach(notification -> notification.setStatus(NotificationStatus.ERROR));
             notificationRepository.saveAll(notifications);
