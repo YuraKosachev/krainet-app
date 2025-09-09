@@ -1,7 +1,8 @@
+version: '3.8'
 services:
   postgres:
     container_name: ms_pg_sql
-    image: postgres
+    image: postgres:17
     environment:
       POSTGRES_USER: krainet_user
       POSTGRES_PASSWORD: krainet_password
@@ -10,205 +11,224 @@ services:
       - postgres:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d/
     ports:
-      - 5435:5430
+      - 5435:5432
     networks:
       - microservices-net
     restart: unless-stopped
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper
+
+  pgadmin:
+    container_name: ms_pgadmin
+    image: dpage/pgadmin4
     environment:
-      ZOOKEEPER_SERVER_ID: 1
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "True"
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - 5050:80
     networks:
       - microservices-net
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     ports:
       - 2181:2181
+    networks:
+      - microservices-net
+
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: ms_kafka
-    ports:
-      - 9092:9092
     depends_on:
       - zookeeper
+    ports:
+      - 9092:9092
     environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
     networks:
       - microservices-net
+
   mail-dev:
     container_name: ms_mail_dev
-    networks:
-      - microservices-net
     image: maildev/maildev
     ports:
       - 1080:1080
       - 1025:1025
+    networks:
+      - microservices-net
+
   configuration:
     image: krainet/configuration
     build:
       context: ./services/configuration/.
-    restart: on-failure
     container_name: configuration_service
-    environment:
-      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: localhost:9092
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://localhost:8761/eureka
-      AUTH_APP_PORT: 8050
-      AUTH_BASE_URL: jdbc:postgresql://localhost:5435/krainet_db
-      AUTH_BASE_USERNAME: krainet_user
-      AUTH_BASE_PASSWORD: krainet_password
-      CONFIGURATION_ENDPOINT_HOST: http://localhost
-      CONFIGURATION_ENDPOINT_PORT: 8888
-      SECURITY_JWT_ISSUER: krainet_app
-      SECURITY_JWT_ACCESS_TOKEN_SECRET: 5e879468423655116c1de6b4dc3e6a51ce69ac88a9b5202f3a51ba8708f7498c63c33a31d16f6f82c157bfc59b27d523f832b1a86c77b3236185f5b756f0d01f
-      SECURITY_JWT_ACCESS_TOKEN_EXPIRED: 86400000
-      SECURITY_JWT_REFRESH_TOKEN_SECRET: e8933ebc11a4405cf607719a1ea86add7b9d0e47580ce65bc2576dc9c6ce6d19646a37d5daa25490cd915e7d091f26dc8e1d8a77a649e63981b84ecdfdd32732
-      SECURITY_JWT_REFRESH_TOKEN_EXPIRED: 604800000
-      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://localhost:5435/notify_db
-      NOTIFICATION_DATASOURCE_USERNAME: krainet_user
-      NOTIFICATION_DATASOURCE_PASSWORD: krainet_password
-      NOTIFICATION_SERVER_PORT: 8040
-      NOTIFICATION_MAIL_SERVER_HOST: localhost
-      NOTIFICATION_MAIL_SERVER_PORT: 1025
-      NOTIFICATION_MAIL_SERVER_USERNAME: krainet_user
-      NOTIFICATION_MAIL_SERVER_PASSWORD: krainet_password
-      EUREKA_INSTANCE_HOSTNAME: localhost
-      DISCOVER_SERVER_PORT: 8761
     ports:
       - "8888:8888"
     networks:
       - microservices-net
+    restart: on-failure
     depends_on:
       - postgres
       - zookeeper
       - kafka
       - mail-dev
-  discovery:
-    image: krainet/discovery
-    build:
-      context: ./services/discovery/.
-    restart: on-failure
-    container_name: discovery_service
-    networks:
-      - microservices-net
-    ports:
-      - "8761:8761"
     environment:
-      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: localhost:9092
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://localhost:8761/eureka
+      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka
       AUTH_APP_PORT: 8050
-      AUTH_BASE_URL: jdbc:postgresql://localhost:5435/krainet_db
+      AUTH_BASE_URL: jdbc:postgresql://postgres:5432/krainet_db
       AUTH_BASE_USERNAME: krainet_user
       AUTH_BASE_PASSWORD: krainet_password
-      CONFIGURATION_ENDPOINT_HOST: http://localhost
+      CONFIGURATION_ENDPOINT_HOST: http://configuration
       CONFIGURATION_ENDPOINT_PORT: 8888
       SECURITY_JWT_ISSUER: krainet_app
       SECURITY_JWT_ACCESS_TOKEN_SECRET: 5e879468423655116c1de6b4dc3e6a51ce69ac88a9b5202f3a51ba8708f7498c63c33a31d16f6f82c157bfc59b27d523f832b1a86c77b3236185f5b756f0d01f
       SECURITY_JWT_ACCESS_TOKEN_EXPIRED: 86400000
       SECURITY_JWT_REFRESH_TOKEN_SECRET: e8933ebc11a4405cf607719a1ea86add7b9d0e47580ce65bc2576dc9c6ce6d19646a37d5daa25490cd915e7d091f26dc8e1d8a77a649e63981b84ecdfdd32732
       SECURITY_JWT_REFRESH_TOKEN_EXPIRED: 604800000
-      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://localhost:5435/notify_db
+      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notify_db
       NOTIFICATION_DATASOURCE_USERNAME: krainet_user
       NOTIFICATION_DATASOURCE_PASSWORD: krainet_password
       NOTIFICATION_SERVER_PORT: 8040
-      NOTIFICATION_MAIL_SERVER_HOST: localhost
+      NOTIFICATION_MAIL_SERVER_HOST: mail-dev
       NOTIFICATION_MAIL_SERVER_PORT: 1025
       NOTIFICATION_MAIL_SERVER_USERNAME: krainet_user
       NOTIFICATION_MAIL_SERVER_PASSWORD: krainet_password
-      EUREKA_INSTANCE_HOSTNAME: localhost
+      EUREKA_INSTANCE_HOSTNAME: configuration
       DISCOVER_SERVER_PORT: 8761
+
+  discovery:
+    image: krainet/discovery
+    build:
+      context: ./services/discovery/.
+    container_name: discovery_service
+    ports:
+      - "8761:8761"
+    networks:
+      - microservices-net
+    restart: on-failure
     depends_on:
       - configuration
+    environment:
+      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka
+      AUTH_APP_PORT: 8050
+      AUTH_BASE_URL: jdbc:postgresql://postgres:5432/krainet_db
+      AUTH_BASE_USERNAME: krainet_user
+      AUTH_BASE_PASSWORD: krainet_password
+      CONFIGURATION_ENDPOINT_HOST: http://configuration
+      CONFIGURATION_ENDPOINT_PORT: 8888
+      SECURITY_JWT_ISSUER: krainet_app
+      SECURITY_JWT_ACCESS_TOKEN_SECRET: 5e879468423655116c1de6b4dc3e6a51ce69ac88a9b5202f3a51ba8708f7498c63c33a31d16f6f82c157bfc59b27d523f832b1a86c77b3236185f5b756f0d01f
+      SECURITY_JWT_ACCESS_TOKEN_EXPIRED: 86400000
+      SECURITY_JWT_REFRESH_TOKEN_SECRET: e8933ebc11a4405cf607719a1ea86add7b9d0e47580ce65bc2576dc9c6ce6d19646a37d5daa25490cd915e7d091f26dc8e1d8a77a649e63981b84ecdfdd32732
+      SECURITY_JWT_REFRESH_TOKEN_EXPIRED: 604800000
+      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notify_db
+      NOTIFICATION_DATASOURCE_USERNAME: krainet_user
+      NOTIFICATION_DATASOURCE_PASSWORD: krainet_password
+      NOTIFICATION_SERVER_PORT: 8040
+      NOTIFICATION_MAIL_SERVER_HOST: mail-dev
+      NOTIFICATION_MAIL_SERVER_PORT: 1025
+      NOTIFICATION_MAIL_SERVER_USERNAME: krainet_user
+      NOTIFICATION_MAIL_SERVER_PASSWORD: krainet_password
+      EUREKA_INSTANCE_HOSTNAME: discovery
+      DISCOVER_SERVER_PORT: 8761
+
   auth:
     image: krainet/auth
     build:
       context: ./services/auth/.
-    restart: on-failure
     container_name: auth_service
     ports:
       - "8050:8050"
     networks:
       - microservices-net
+    restart: on-failure
+    depends_on:
+      - discovery
     environment:
-      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: localhost:9092
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://localhost:8761/eureka
+      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka
       AUTH_APP_PORT: 8050
-      AUTH_BASE_URL: jdbc:postgresql://localhost:5435/krainet_db
+      AUTH_BASE_URL: jdbc:postgresql://postgres:5432/krainet_db
       AUTH_BASE_USERNAME: krainet_user
       AUTH_BASE_PASSWORD: krainet_password
-      CONFIGURATION_ENDPOINT_HOST: http://localhost
+      CONFIGURATION_ENDPOINT_HOST: http://configuration
       CONFIGURATION_ENDPOINT_PORT: 8888
       SECURITY_JWT_ISSUER: krainet_app
       SECURITY_JWT_ACCESS_TOKEN_SECRET: 5e879468423655116c1de6b4dc3e6a51ce69ac88a9b5202f3a51ba8708f7498c63c33a31d16f6f82c157bfc59b27d523f832b1a86c77b3236185f5b756f0d01f
       SECURITY_JWT_ACCESS_TOKEN_EXPIRED: 86400000
       SECURITY_JWT_REFRESH_TOKEN_SECRET: e8933ebc11a4405cf607719a1ea86add7b9d0e47580ce65bc2576dc9c6ce6d19646a37d5daa25490cd915e7d091f26dc8e1d8a77a649e63981b84ecdfdd32732
       SECURITY_JWT_REFRESH_TOKEN_EXPIRED: 604800000
-      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://localhost:5435/notify_db
+      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notify_db
       NOTIFICATION_DATASOURCE_USERNAME: krainet_user
       NOTIFICATION_DATASOURCE_PASSWORD: krainet_password
       NOTIFICATION_SERVER_PORT: 8040
-      NOTIFICATION_MAIL_SERVER_HOST: localhost
+      NOTIFICATION_MAIL_SERVER_HOST: mail-dev
       NOTIFICATION_MAIL_SERVER_PORT: 1025
       NOTIFICATION_MAIL_SERVER_USERNAME: krainet_user
       NOTIFICATION_MAIL_SERVER_PASSWORD: krainet_password
-      EUREKA_INSTANCE_HOSTNAME: localhost
+      EUREKA_INSTANCE_HOSTNAME: auth
       DISCOVER_SERVER_PORT: 8761
-    depends_on:
-      - postgres
-      - zookeeper
-      - kafka
-      - mail-dev
-      - configuration
-      - discovery
+
   notification:
     image: krainet/notification
     build:
       context: ./services/notification/.
-    restart: on-failure
     container_name: notification_service
     ports:
       - "8040:8040"
     networks:
       - microservices-net
+    restart: on-failure
+    depends_on:
+      - discovery
     environment:
-      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: localhost:9092
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://localhost:8761/eureka
+      KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka
       AUTH_APP_PORT: 8050
-      AUTH_BASE_URL: jdbc:postgresql://localhost:5435/krainet_db
+      AUTH_BASE_URL: jdbc:postgresql://postgres:5432/krainet_db
       AUTH_BASE_USERNAME: krainet_user
       AUTH_BASE_PASSWORD: krainet_password
-      CONFIGURATION_ENDPOINT_HOST: http://localhost
+      CONFIGURATION_ENDPOINT_HOST: http://configuration
       CONFIGURATION_ENDPOINT_PORT: 8888
       SECURITY_JWT_ISSUER: krainet_app
       SECURITY_JWT_ACCESS_TOKEN_SECRET: 5e879468423655116c1de6b4dc3e6a51ce69ac88a9b5202f3a51ba8708f7498c63c33a31d16f6f82c157bfc59b27d523f832b1a86c77b3236185f5b756f0d01f
       SECURITY_JWT_ACCESS_TOKEN_EXPIRED: 86400000
       SECURITY_JWT_REFRESH_TOKEN_SECRET: e8933ebc11a4405cf607719a1ea86add7b9d0e47580ce65bc2576dc9c6ce6d19646a37d5daa25490cd915e7d091f26dc8e1d8a77a649e63981b84ecdfdd32732
       SECURITY_JWT_REFRESH_TOKEN_EXPIRED: 604800000
-      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://localhost:5435/notify_db
+      NOTIFICATION_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notify_db
       NOTIFICATION_DATASOURCE_USERNAME: krainet_user
       NOTIFICATION_DATASOURCE_PASSWORD: krainet_password
       NOTIFICATION_SERVER_PORT: 8040
-      NOTIFICATION_MAIL_SERVER_HOST: localhost
+      NOTIFICATION_MAIL_SERVER_HOST: mail-dev
       NOTIFICATION_MAIL_SERVER_PORT: 1025
       NOTIFICATION_MAIL_SERVER_USERNAME: krainet_user
       NOTIFICATION_MAIL_SERVER_PASSWORD: krainet_password
-      EUREKA_INSTANCE_HOSTNAME: localhost
+      EUREKA_INSTANCE_HOSTNAME: notification
       DISCOVER_SERVER_PORT: 8761
-    depends_on:
-      - postgres
-      - zookeeper
-      - kafka
-      - mail-dev
-      - configuration
-      - discovery
 
 networks:
   microservices-net:
     driver: bridge
+
 volumes:
   postgres:
+  pgadmin:
+
