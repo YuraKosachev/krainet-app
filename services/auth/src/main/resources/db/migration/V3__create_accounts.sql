@@ -1,0 +1,1 @@
+INSERT INTO public.accounts VALUES (gen_random_uuid(), 'admin', 'admin@admin.ru', 'Admin', 'Admin','$2a$10$MTAHT6PodKKfXuw8a2rAru4nuYj6rA9mloElGb/L..y1mkNKU/7NW', now(),0,0 )

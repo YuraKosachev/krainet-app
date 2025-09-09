@@ -1,0 +1,5 @@
+ALTER TABLE accounts
+    ADD role SMALLINT;
+
+ALTER TABLE accounts
+    ALTER COLUMN role SET NOT NULL;

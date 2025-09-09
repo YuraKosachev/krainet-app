@@ -1,0 +1,45 @@
+spring:
+  kafka:
+    producer:
+      bootstrap-servers: ${KAFKA_PRODUCER_BOOTSTRAP_SERVERS}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.type.mapping: notificationMessage:com.krainet.auth.core.models.kafka.NotificationMessage
+  datasource:
+    url: ${AUTH_BASE_URL}
+    username: ${AUTH_BASE_USERNAME}
+    password: ${AUTH_BASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+    enabled: true
+    baseline-description: "init"
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+server:
+  port: ${AUTH_APP_PORT}
+springdoc:
+  #  api-docs:
+  #    path: /api-docs
+  swagger-ui:
+    disable-swagger-default-url: true
+    path: /
+security:
+  jwt:
+    issuer: ${SECURITY_JWT_ISSUER}
+    access-token:
+      secret-key: ${SECURITY_JWT_ACCESS_TOKEN_SECRET}
+      expired: ${SECURITY_JWT_ACCESS_TOKEN_EXPIRED} # 24 hours
+    refresh-token:
+      secret_key: ${SECURITY_JWT_REFRESH_TOKEN_SECRET}
+      expired: ${SECURITY_JWT_REFRESH_TOKEN_EXPIRED} # 7 days
+task:
+  notification:
+    cron: "*/5 * * * * *"

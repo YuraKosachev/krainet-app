@@ -1,0 +1,50 @@
+spring:
+  kafka:
+    consumer:
+      bootstrap-servers: ${KAFKA_PRODUCER_BOOTSTRAP_SERVERS}
+      group-id: notificationGroup
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: 'com.krainet'
+        spring.json.type.mapping: notificationMessage:com.krainet.notification.core.models.kafka.NotificationMessage
+  datasource:
+    url: ${NOTIFICATION_DATASOURCE_URL}
+    username: ${NOTIFICATION_DATASOURCE_USERNAME}
+    password: ${NOTIFICATION_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+    enabled: true
+    baseline-description: "init"
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+
+  mail:
+    host: ${NOTIFICATION_MAIL_SERVER_HOST}
+    port: ${NOTIFICATION_MAIL_SERVER_PORT}
+    username: ${NOTIFICATION_MAIL_SERVER_USERNAME}
+    password: ${NOTIFICATION_MAIL_SERVER_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          trust: "*"
+        auth: true
+        starttls:
+          enabled: true
+        connectiontimeout: 5000
+        timeout: 3000
+        writetimeout: 5000
+server:
+  port: ${NOTIFICATION_SERVER_PORT}
+
+task:
+  notification:
+    cron: "*/5 * * * * *"
