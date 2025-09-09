@@ -50,7 +50,7 @@ services:
   configuration:
     image: krainet/configuration
     build:
-      context: ./services/configuration
+      context: ./services/configuration/.
     restart: on-failure
     container_name: configuration_service
     environment:
@@ -69,7 +69,7 @@ services:
   discovery:
     image: krainet/discovery
     build:
-      context: ./services/discovery
+      context: ./services/discovery/.
     restart: on-failure
     container_name: discovery_service
     networks:
@@ -86,7 +86,7 @@ services:
   auth:
     image: krainet/auth
     build:
-      context: ./services/auth
+      context: ./services/auth/.
     restart: on-failure
     container_name: auth_service
     ports:
@@ -117,7 +117,7 @@ services:
   notification:
     image: krainet/notification
     build:
-      context: ./services/notification
+      context: ./services/notification/.
     restart: on-failure
     container_name: notification_service
     ports:
